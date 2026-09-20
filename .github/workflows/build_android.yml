@@ -1,59 +1,51 @@
-name: Build Android App
+name: Build-Android
 
-# 触发条件：推送到 main/master 分支，或者打 tag 时触发
 on:
   push:
-    branches:
-      - main
-      - master
-    tags:
-      - 'v*'
-  # 支持在 GitHub 页面手动点击运行
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2. 配置 Java 环境 (Flutter Android 需要 Java 17)
+      # 1. 配置 Java 环境（Android 构建必备）
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 3. 配置 Flutter 环境
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      # 2. 配置 Flutter 环境（保持与你的 iOS 相同的 3.24.0 版本）
+      - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable' # 使用 stable 分支
-          # flutter-version: '3.19.0' # 也可以锁定具体的 Flutter 版本
+          flutter-version: '3.24.0'
+          cache: true
 
-      # 4. 获取项目依赖
-      - name: Install dependencies
-        run: flutter pub get
+      # 3. 清理与获取依赖
+      - name: flutter clean & pub get
+        run: |
+          flutter clean
+          flutter pub get
 
-      # 5. 构建 APK (如果是正式发布，可改为 flutter build appbundle)
+      # 4. 动态重新生成/补全 android 目录 (解决 missing build.gradle 报错)
+      - name: Regenerate Android project
+        run: |
+          # 如果之前提交过不完整的 android 目录，先清理掉
+          rm -rf android
+          # 重新生成 android 原生工程结构
+          flutter create . --platforms android --project-name baiyun_keys
+
+      # 5. 构建 release APK
       - name: Build APK
         run: flutter build apk --release
 
-      # 6. 将构建出来的 APK 上传为 GitHub Artifact (方便直接在页面下载)
-      - name: Upload APK Artifact
+      # 6. 上传 Artifact (APK 产物)
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
+          name: baiyun-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-
-      # 7. (可选) 如果推送到 Tag，自动创建 GitHub Release 并附带 APK 文件
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/app/outputs/flutter-apk/app-release.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
