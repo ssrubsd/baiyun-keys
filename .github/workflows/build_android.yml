@@ -25,22 +25,24 @@ jobs:
           flutter-version: '3.24.0'
           cache: true
 
-      # 3. 获取依赖
+      # 3. 清理与获取依赖
       - name: flutter clean & pub get
         run: |
           flutter clean
           flutter pub get
 
-      # 4. 动态生成 Android 目录并注入兼容变量
+      # 4. 动态生成 Android 目录 + 升级 Kotlin 版本 + 注入 SDK 变量
       - name: Regenerate & Configure Android Project
         run: |
           rm -rf android
           flutter create . --platforms android --project-name baiyun_keys
 
-          # 注入旧版插件兼容变量
+          # 强制将 settings.gradle 中的 Kotlin 插件升级到 1.9.24
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "1.9.24"/' android/settings.gradle
+
+          # 注入旧版插件所需的全局变量
           cat << 'EOF' >> android/build.gradle
 
-          // 兼容 flutter_blue_plus_android 等第三方插件
           ext.compileSdkVersion = 34
           ext.minSdkVersion = 21
           ext.targetSdkVersion = 34
